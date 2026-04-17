@@ -1,0 +1,33 @@
+{
+  "name": "form-surveilans-harian-infeksi",
+  "version": "1.0.0",
+  "description": "Form surveilans harian infeksi untuk rumah sakit",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx live-server --port=8080 --host=localhost",
+    "build": "echo 'No build step needed for static HTML'",
+    "test": "echo 'No test configured yet'",
+    "lint": "echo 'No lint configured yet'",
+    "deploy": "echo 'Deployment handled by GitHub Actions'"
+  },
+  "keywords": [
+    "surveilans",
+    "infeksi",
+    "rumah-sakit",
+    "form",
+    "kesehatan"
+  ],
+  "author": "adptrawork",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/adptrawork/FORM-surveilans-harian-infeksi.git"
+  },
+  "devDependencies": {
+    "htmlhint": "^1.1.4",
+    "live-server": "^1.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

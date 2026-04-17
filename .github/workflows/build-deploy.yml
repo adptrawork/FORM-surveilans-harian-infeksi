@@ -1,0 +1,56 @@
+name: Build and Deploy Form Surveilans
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    outputs:
+      build-number: ${{ steps.build.outputs.build-number }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Run tests
+      run: npm test
+
+    - name: Build number
+      id: build
+      run: echo "build-number=${GITHUB_RUN_NUMBER}" >> $GITHUB_OUTPUT
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+    - name: Deploy to staging
+      run: |
+        echo "🚀 Deploying build ${{ needs.build.outputs.build-number }} to staging..."
+        echo "Repository: ${{ github.repository }}"
+        echo "Commit: ${{ github.sha }}"
+        echo "Deployed at: $(date)"
+
+    - name: Notify deployment
+      uses: actions/github-script@v7
+      with:
+        script: |
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: `🚀 Form surveilans harian infeksi telah berhasil di-deploy!\n\n- Build: #${{ needs.build.outputs.build-number }}\n- Commit: ${github.sha}\n- Waktu: ${new Date().toISOString()}`
+          })

@@ -1,0 +1,79 @@
+name: Deploy to Production Server
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup SSH
+      uses: webfactory/ssh-agent@v0.9.0
+      with:
+        ssh-private-key: ${{ secrets.PRODUCTION_SSH_PRIVATE_KEY }}
+
+    - name: Create production package
+      run: |
+        mkdir -p production-package
+        cp -r index.html .github/ production-package/
+        cd production-package
+        echo "DEPLOYMENT_ID=${GITHUB_SHA}" > .env
+        echo "DEPLOYED_AT=$(date)" >> .env
+        echo "BUILD_NUMBER=${GITHUB_RUN_NUMBER}" >> .env
+        tar -czf ../form-surveilans-${GITHUB_SHA}.tar.gz .
+
+    - name: Deploy to Production Server
+      run: |
+        # Update this with your production server details
+        SSH_HOST="${{ secrets.PRODUCTION_SSH_HOST }}"
+        SSH_USER="${{ secrets.PRODUCTION_SSH_USER }}"
+        REMOTE_PATH="${{ secrets.PRODUCTION_REMOTE_PATH }}"
+
+        echo "🚀 Deploying to production server..."
+        echo "Host: $SSH_HOST"
+        echo "User: $SSH_USER"
+        echo "Path: $REMOTE_PATH"
+
+        # Copy files to server
+        scp -o StrictHostKeyChecking=no form-surveilans-${GITHUB_SHA}.tar.gz ${SSH_USER}@${SSH_HOST}:${REMOTE_PATH}/
+
+        # Extract and deploy on server
+        ssh -o StrictHostKeyChecking=no ${SSH_USER}@${SSH_HOST} "
+          cd ${REMOTE_PATH}
+          mkdir -p backup/$(date +%Y%m%d-%H%M%S)
+          cp -r * backup/$(date +%Y%m%d-%H%M%S)/ 2>/dev/null || true
+          rm -rf *
+          tar -xzf form-surveilans-${GITHUB_SHA}.tar.gz
+          rm form-surveilans-${GITHUB_SHA}.tar.gz
+          echo '✅ Deployment completed successfully'
+        "
+
+    - name: Cleanup
+      run: |
+        rm -f form-surveilans-${GITHUB_SHA}.tar.gz
+
+    - name: Create deployment tag
+      if: github.ref == 'refs/heads/main'
+      run: |
+        git tag -a "deploy-${GITHUB_SHA}" -m "Deployment ${GITHUB_SHA}"
+        git push origin "deploy-${GITHUB_SHA}"
+
+    - name: Notify deployment success
+      uses: actions/github-script@v7
+      with:
+        script: |
+          github.rest.repos.createRelease({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            tag_name: `deploy-${{ github.sha }}`,
+            name: `Deployment ${new Date().toISOString()}`,
+            body: `Form surveilans harian infeksi telah berhasil di-deploy ke production server!\n\n- Commit: ${github.sha}\n- Build: ${GITHUB_RUN_NUMBER}\n- Timestamp: ${new Date().toISOString()}`,
+            draft: false,
+            prerelease: false
+          })

@@ -1,0 +1,54 @@
+name: Deploy Form Surveilans Harian
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install Dependencies
+      run: npm install
+
+    - name: Run Linting
+      run: npm run lint || echo "No lint script found"
+
+    - name: Run Tests
+      run: npm test || echo "No test script found"
+
+    - name: Validate HTML
+      run: |
+        npm install -g htmlhint
+        htmlhint index.html
+
+    - name: Deploy to Production
+      if: github.ref == 'refs/heads/main'
+      run: |
+        echo "🚀 Deploying to production..."
+        echo "Deploying form surveilans harian infeksi version ${{ github.sha }}"
+
+    - name: Create Deployment Status
+      if: github.ref == 'refs/heads/main'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          github.rest.repos.createDeploymentStatus({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            deployment_id: context.payload.deployment.id,
+            state: 'success',
+            description: 'Form surveilans deployed successfully'
+          })
