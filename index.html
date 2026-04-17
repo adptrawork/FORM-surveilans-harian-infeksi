@@ -1,0 +1,292 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta http-equiv='expires' content='-1' />
+    <meta http-equiv='pragma' content='no-cache' />
+    <meta name="robots" content="noindex" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SISTEM MANAJEMEN RUMAH SAKIT - Surveilans Harian</title>
+    
+    <!-- Using CDNs to ensure scripts load correctly in this environment -->
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+    
+    <!-- CSS Fallback/Internal Styles to replace missing /assets/css -->
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; }
+        .main { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .judul { border-bottom: 2px solid #007bff; padding-bottom: 10px; color: #333; text-transform: uppercase; font-size: 1.5em; }
+        .table-input { width: 100%; border-collapse: collapse; margin-top: 20px; background: #fff; }
+        .table-input th { background: #007bff; color: #fff; padding: 10px; font-size: 12px; }
+        .table-input td { padding: 8px; border: 1px solid #ddd; }
+        .input { padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 100%; box-sizing: border-box; }
+        .tombol { padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        .tombol:hover { opacity: 0.8; }
+        #tambahBaris { background-color: #007bff; color: white; margin-top: 10px; }
+        .div-foot { margin-top: 20px; font-size: 12px; }
+        .icd_tr:nth-child(even) { background-color: #f9f9f9; }
+        fieldset { border: 1px solid #ddd; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+        legend { font-weight: bold; color: #007bff; padding: 0 10px; }
+    </style>
+
+    <!-- Essential Scripts -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+
+    <script type="text/javascript">
+        // Ensure $ is defined before using it
+        $(document).ready(function() {
+            // Global Datepicker Setup
+            $('body').delegate('.datetimepicker', 'focusin', function() {
+                $(this).datepicker({
+                    dateFormat: 'dd/mm/yy',
+                    changeMonth: true,
+                    changeYear: true
+                });
+            });
+
+            // Init for existing date-picker-month if any
+            $('.date-picker-month').datepicker({
+                dateFormat: 'mm/yy',
+                changeMonth: true,
+                changeYear: true,
+                showButtonPanel: true,
+                onClose: function(dateText, inst) {
+                    $(this).datepicker('setDate', new Date(inst.selectedYear, inst.selectedMonth, 1));
+                }
+            });
+
+            // Ruangan Autocomplete Simulation (Mocking local API for preview)
+            $('#ruangan').autocomplete({
+                source: function(request, response) {
+                    // In real app, this calls /admisi/search?opsi=unit
+                    const mockData = [
+                        { label: "Rawat Inap Anak", value: "Rawat Inap Anak", id: "101" },
+                        { label: "IGD", value: "IGD", id: "102" },
+                        { label: "Klinik Paru", value: "Klinik Paru", id: "103" }
+                    ];
+                    response(mockData.filter(i => i.label.toLowerCase().includes(request.term.toLowerCase())));
+                },
+                select: function(event, ui) {
+                    $("#id_unit").val(ui.item.id);
+                }
+            });
+        });
+
+        function initAutocomplete(count) {
+            // Row Datepicker
+            $('#tanggal' + count + ', #tgl_pasang' + count).datepicker({
+                changeMonth: true,
+                changeYear: true,
+                dateFormat: 'dd/mm/yy'
+            });
+
+            // Patient Search Simulation
+            $('#norm' + count).autocomplete({
+                source: function(request, response) {
+                    const mockPatients = [
+                        { label: "00043203 - ROSDIANA", value: "00043203 - ROSDIANA", tgl_masuk: "10/04/2026", tgl_keluar: "-" },
+                        { label: "036051 - DORMATUA MANURUNG", value: "036051 - DORMATUA MANURUNG", tgl_masuk: "06/04/2026", tgl_keluar: "17/04/2026" }
+                    ];
+                    response(mockPatients.filter(p => p.label.toLowerCase().includes(request.term.toLowerCase())));
+                },
+                select: function(event, ui) {
+                    $('#tgl_masuk' + count).val(ui.item.tgl_masuk);
+                    $('#tgl_keluar' + count).val(ui.item.tgl_keluar);
+                }
+            });
+
+            // Diagnosis Search Simulation
+            $('#diagnosa' + count).autocomplete({
+                source: function(request, response) {
+                    const mockICD = [
+                        { label: "A00 - Cholera", value: "A00 - Cholera" },
+                        { label: "B00 - Herpesviral infections", value: "B00 - Herpesviral infections" }
+                    ];
+                    response(mockICD.filter(d => d.label.toLowerCase().includes(request.term.toLowerCase())));
+                }
+            });
+        }
+    </script>
+</head>
+<body>
+    <div class="main">
+        <h2 class="judul">FORM surveilans harian infeksi</h2>
+        <div class="data-input">
+            <form id="form-data" onsubmit="return false">
+                <fieldset style="border:none">
+                    <table width="100%">
+                        <tr>
+                            <td width="20%">Ruangan*</td>
+                            <td width="2%">:</td>
+                            <td>
+                                <input type="text" class="input" style="width: 250px;" name="ruangan" id="ruangan" placeholder="Cari Ruangan...">
+                                <input type="hidden" name="id_unit" id="id_unit" value="">
+                            </td>
+                            <td width="20%">Bulan/Tahun</td>
+                            <td width="2%">:</td>
+                            <td>
+                                <input type="text" class="input date-picker-month" style="width: 120px;" name="tahun" id="tahun" value="04/2026">
+                            </td>
+                        </tr>
+                    </table>
+                </fieldset>
+
+                <div style="overflow-x:auto;">
+                    <table class="table-input" id="data-table" border="1" cellspacing="0">
+                        <thead>
+                            <tr>
+                                <th rowspan="2">No</th>
+                                <th rowspan="2">Tanggal</th>
+                                <th rowspan="2">Nama/Norm</th>
+                                <th rowspan="2">Pasien Masuk</th>
+                                <th rowspan="2">Pasien Keluar</th>
+                                <th rowspan="2">DX medis</th>
+                                <th colspan="4">Tindakan</th>
+                                <th rowspan="2">Tgl Pasang Alat</th>
+                                <th colspan="4">Infeksi RS</th>
+                                <th rowspan="2">Tirah Baring</th>
+                                <th rowspan="2">Dekub</th>
+                                <th rowspan="2">PHIEB</th>
+                                <th rowspan="2">Macam AB</th>
+                                <th rowspan="2">Hasil Kultur</th>
+                                <th rowspan="2">Aksi</th>
+                            </tr>
+                            <tr>
+                                <th>UC</th>
+                                <th>IVL</th>
+                                <th>CVL</th>
+                                <th>ETT/V</th>
+                                <th>VAP</th>
+                                <th>HAP</th>
+                                <th>ISK</th>
+                                <th>IAD</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Rows added here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="margin-top:10px;">
+                    <input type="button" class="tombol" value="+ Tambah Baris" id="tambahBaris" />
+                </div>
+
+                <div class="div-foot">
+                    <fieldset>
+                        <legend>Keterangan Singkatan:</legend>
+                        <table width="100%" style="font-size: 11px; line-height: 1.6;">
+                            <tr>
+                                <td><b>UC:</b> Urine Catheter</td>
+                                <td><b>VAP:</b> Ventilator Assoc. Pneumonia</td>
+                                <td><b>AB:</b> Antibiotik</td>
+                            </tr>
+                            <tr>
+                                <td><b>IVL:</b> Intra Vena Line</td>
+                                <td><b>HAP:</b> Hospital Acquired Infection</td>
+                                <td><b>S:</b> Sputum</td>
+                            </tr>
+                            <tr>
+                                <td><b>CVL:</b> Centra Vena Line</td>
+                                <td><b>ISK:</b> Infeksi Saluran Kemih</td>
+                                <td><b>D:</b> Darah</td>
+                            </tr>
+                            <tr>
+                                <td><b>ETT:</b> Endhotracheal Tube</td>
+                                <td><b>IAD:</b> Infeksi Aliran Darah</td>
+                                <td><b>U:</b> Urine</td>
+                            </tr>
+                        </table>
+                    </fieldset>
+                </div>
+
+                <div align="right" style="margin-top: 20px;">
+                    <button type="button" class="tombol" style="background-color: #28a745; color:white" id="btnsimpan" onclick="simpan()">Simpan Data</button>
+                    <button type="button" class="tombol" style="background-color: #6c757d; color:white" onclick="location.reload()">Batal</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        $(document).ready(function() {
+            $("#tambahBaris").click(function() {
+                var counter = $('.icd_tr').length + 1;
+                var string = "<tr class='icd_tr'>" +
+                    "<td align='center'>" + counter + "</td>" +
+                    "<td><input type='text' class='input' style='width:85px' name='data[" + counter + "][tanggal]' id='tanggal" + counter + "' value='17/04/2026' /></td>" +
+                    "<td><input type='text' class='input' style='width:160px' name='data[" + counter + "][pasien]' id='norm" + counter + "' placeholder='Cari Nama/RM...' /></td>" +
+                    "<td><input type='text' class='input' style='width:85px; background:#eee;' name='data[" + counter + "][tgl_masuk]' id='tgl_masuk" + counter + "' readonly /></td>" +
+                    "<td><input type='text' class='input' style='width:85px; background:#eee;' name='data[" + counter + "][tgl_keluar]' id='tgl_keluar" + counter + "' readonly /></td>" +
+                    "<td><input type='text' class='input' style='width:160px' name='data[" + counter + "][diagnosa]' id='diagnosa" + counter + "' /></td>" +
+                    "<td align='center'><input type='checkbox' name='data[" + counter + "][uc]' value='Y' /></td>" +
+                    "<td align='center'><input type='checkbox' name='data[" + counter + "][ivl]' value='Y' /></td>" +
+                    "<td align='center'><input type='checkbox' name='data[" + counter + "][cvl]' value='Y' /></td>" +
+                    "<td align='center'><input type='checkbox' name='data[" + counter + "][ett]' value='Y' /></td>" +
+                    "<td><input type='text' class='input' style='width:85px' name='data[" + counter + "][tgl_pasang]' id='tgl_pasang" + counter + "' placeholder='dd/mm/yyyy' /></td>" +
+                    "<td align='center'><input type='checkbox' name='data[" + counter + "][vap]' value='Y' /></td>" +
+                    "<td align='center'><input type='checkbox' name='data[" + counter + "][hap]' value='Y' /></td>" +
+                    "<td align='center'><input type='checkbox' name='data[" + counter + "][isk]' value='Y' /></td>" +
+                    "<td align='center'><input type='checkbox' name='data[" + counter + "][iad]' value='Y' /></td>" +
+                    "<td align='center'><input type='checkbox' name='data[" + counter + "][tirah_baring]' value='Y' /></td>" +
+                    "<td align='center'><input type='checkbox' name='data[" + counter + "][dekub]' value='Y' /></td>" +
+                    "<td align='center'><input type='checkbox' name='data[" + counter + "][phib]' value='Y' /></td>" +
+                    "<td><textarea class='input' name='data[" + counter + "][ab]' style='width:100px; height:40px;'></textarea></td>" +
+                    "<td>" +
+                        "<table width='100%'>" +
+                            "<tr><td>S</td><td><input type='text' class='input' style='width:40px' name='data[" + counter + "][s]'/></td></tr>" +
+                            "<tr><td>D</td><td><input type='text' class='input' style='width:40px' name='data[" + counter + "][d]'/></td></tr>" +
+                            "<tr><td>U</td><td><input type='text' class='input' style='width:40px' name='data[" + counter + "][u]'/></td></tr>" +
+                        "</table>" +
+                    "</td>" +
+                    "<td align='center'><button type='button' class='tombol' style='background:#dc3545; color:white; padding: 4px 8px;' onClick='deleteElement(this)'>Hapus</button></td>" +
+                    "</tr>";
+                
+                $("#data-table tbody").append(string);
+                initAutocomplete(counter);
+            });
+        });
+
+        function deleteElement(el) {
+            $(el).closest('tr').remove();
+            // Re-index rows
+            $('.icd_tr').each(function(index) {
+                var newIdx = index + 1;
+                $(this).find('td:first').text(newIdx);
+                $(this).find('input, textarea').each(function() {
+                    var name = $(this).attr('name');
+                    if(name) $(this).attr('name', name.replace(/\[\d+\]/, '[' + newIdx + ']'));
+                    var id = $(this).attr('id');
+                    if(id) $(this).attr('id', id.replace(/\d+$/, newIdx));
+                });
+            });
+        }
+
+        function simpan() {
+            if ($("#id_unit").val() == "") {
+                toastr.warning("Silahkan pilih Ruangan terlebih dahulu.");
+                $("#ruangan").focus();
+                return false;
+            }
+            
+            if ($('.icd_tr').length == 0) {
+                toastr.warning("Belum ada data pasien yang ditambahkan.");
+                return false;
+            }
+
+            if (confirm('Simpan data surveilans harian ini?')) {
+                toastr.info("Menyimpan data...");
+                // In actual app, this would be an AJAX call to /admisi/suerveilens/harian/control
+                console.log("Form Data Serialized:", $("#form-data").serialize());
+                setTimeout(() => {
+                    toastr.success("Data berhasil disimpan secara simulasi.");
+                }, 1000);
+            }
+        }
+    </script>
+</body>
+</html>
