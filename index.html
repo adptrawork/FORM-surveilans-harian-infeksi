@@ -36,6 +36,15 @@
     <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
 
+    <!-- API Integration Notes -->
+    <!--
+    IMPLEMENTATION GUIDE:
+    1. Patient Data API: Replace mock patient data with real API calls to /api/patients/{norm}
+    2. Hospital Database: Connect to the hospital's patient management system
+    3. Form Submission: The form submits to /admisi/suerveilens/harian/control
+    4. Date Validation: Tanggal penggunaan alat medis must be >= tanggal pasien dirawat
+    -->
+
     <script type="text/javascript">
         // Ensure $ is defined before using it
         $(document).ready(function() {
@@ -78,7 +87,7 @@
 
         function initAutocomplete(count) {
             // Row Datepicker
-            $('#tanggal' + count + ', #tgl_pasang' + count).datepicker({
+            $('#tanggal' + count + ', #tgl_pasang' + count + ', #tanggal_penggunaan_alat' + count).datepicker({
                 changeMonth: true,
                 changeYear: true,
                 dateFormat: 'dd/mm/yy'
@@ -87,15 +96,43 @@
             // Patient Search Simulation
             $('#norm' + count).autocomplete({
                 source: function(request, response) {
+                    // In real app, this would call /api/patients/search?norm={term}
                     const mockPatients = [
-                        { label: "00043203 - ROSDIANA", value: "00043203 - ROSDIANA", tgl_masuk: "10/04/2026", tgl_keluar: "-" },
-                        { label: "036051 - DORMATUA MANURUNG", value: "036051 - DORMATUA MANURUNG", tgl_masuk: "06/04/2026", tgl_keluar: "17/04/2026" }
+                        {
+                            label: "00043203 - ROSDIANA",
+                            value: "00043203 - ROSDIANA",
+                            tgl_masuk: "10/04/2026",
+                            tgl_keluar: "-",
+                            alat_medis: "12/04/2026",
+                            diagnosis: "A00 - Cholera"
+                        },
+                        {
+                            label: "036051 - DORMATUA MANURUNG",
+                            value: "036051 - DORMATUA MANURUNG",
+                            tgl_masuk: "06/04/2026",
+                            tgl_keluar: "17/04/2026",
+                            alat_medis: "08/04/2026",
+                            diagnosis: "B00 - Herpesviral infections"
+                        },
+                        {
+                            label: "045678 - SITI MAJIDAH",
+                            value: "045678 - SITI MAJIDAH",
+                            tgl_masuk: "15/04/2026",
+                            tgl_keluar: "-",
+                            alat_medis: "",
+                            diagnosis: "J45 - Asthma"
+                        }
                     ];
                     response(mockPatients.filter(p => p.label.toLowerCase().includes(request.term.toLowerCase())));
                 },
                 select: function(event, ui) {
                     $('#tgl_masuk' + count).val(ui.item.tgl_masuk);
                     $('#tgl_keluar' + count).val(ui.item.tgl_keluar);
+                    $('#tanggal_penggunaan_alat' + count).val(ui.item.alat_medis);
+                    $('#diagnosa' + count).val(ui.item.diagnosis);
+
+                    // Log for debugging
+                    console.log("Patient selected:", ui.item);
                 }
             });
 
@@ -146,6 +183,7 @@
                                 <th rowspan="2">Pasien Keluar</th>
                                 <th rowspan="2">DX medis</th>
                                 <th colspan="4">Tindakan</th>
+                                <th rowspan="2">Tanggal Penggunaan Alat Medis</th>
                                 <th rowspan="2">Tgl Pasang Alat</th>
                                 <th colspan="4">Infeksi RS</th>
                                 <th rowspan="2">Tirah Baring</th>
@@ -200,6 +238,9 @@
                                 <td><b>IAD:</b> Infeksi Aliran Darah</td>
                                 <td><b>U:</b> Urine</td>
                             </tr>
+                            <tr>
+                                <td colspan="3"><b>Tanggal Penggunaan Alat Medis:</b> Tanggal pemasangan alat medis yang digunakan pada pasien</td>
+                            </tr>
                         </table>
                     </fieldset>
                 </div>
@@ -227,6 +268,7 @@
                     "<td align='center'><input type='checkbox' name='data[" + counter + "][ivl]' value='Y' /></td>" +
                     "<td align='center'><input type='checkbox' name='data[" + counter + "][cvl]' value='Y' /></td>" +
                     "<td align='center'><input type='checkbox' name='data[" + counter + "][ett]' value='Y' /></td>" +
+                    "<td><input type='text' class='input' style='width:85px' name='data[" + counter + "][tanggal_penggunaan]' id='tanggal_penggunaan_alat" + counter + "' placeholder='dd/mm/yyyy' /></td>" +
                     "<td><input type='text' class='input' style='width:85px' name='data[" + counter + "][tgl_pasang]' id='tgl_pasang" + counter + "' placeholder='dd/mm/yyyy' /></td>" +
                     "<td align='center'><input type='checkbox' name='data[" + counter + "][vap]' value='Y' /></td>" +
                     "<td align='center'><input type='checkbox' name='data[" + counter + "][hap]' value='Y' /></td>" +
@@ -266,22 +308,90 @@
             });
         }
 
+        // Function to retrieve patient data from hospital database
+        function retrievePatientData(norm) {
+            // In real implementation, this would call the hospital database API
+            // Example: /api/patients/{norm}
+            $.ajax({
+                url: '/api/patients/' + norm,
+                type: 'GET',
+                dataType: 'json',
+                success: function(response) {
+                    console.log("Patient data retrieved:", response);
+                    return response;
+                },
+                error: function(xhr, status, error) {
+                    console.error("Error retrieving patient data:", error);
+                    toastr.error("Gagal mengambil data pasien: " + error);
+                    return null;
+                }
+            });
+        }
+
+        // Function to validate medical device date
+        function validateMedicalDeviceDate(rowId, deviceDate) {
+            const patientDate = $('#tanggal' + rowId).val();
+            if (deviceDate && patientDate) {
+                const device = new Date(deviceDate.split('/').reverse().join('-'));
+                const patient = new Date(patientDate.split('/').reverse().join('-'));
+
+                if (device < patient) {
+                    toastr.warning("Tanggal penggunaan alat medis tidak boleh sebelum tanggal pasien dirawat");
+                    return false;
+                }
+            }
+            return true;
+        }
+
         function simpan() {
             if ($("#id_unit").val() == "") {
                 toastr.warning("Silahkan pilih Ruangan terlebih dahulu.");
                 $("#ruangan").focus();
                 return false;
             }
-            
+
             if ($('.icd_tr').length == 0) {
                 toastr.warning("Belum ada data pasien yang ditambahkan.");
                 return false;
             }
 
+            // Validate all medical device dates
+            let hasInvalidDate = false;
+            $('.icd_tr').each(function() {
+                const rowId = $(this).find('input[id^="tanggal_penggunaan_alat"]').attr('id').replace('tanggal_penggunaan_alat', '');
+                const deviceDate = $('#tanggal_penggunaan_alat' + rowId).val();
+                if (!validateMedicalDeviceDate(rowId, deviceDate)) {
+                    hasInvalidDate = true;
+                }
+            });
+
+            if (hasInvalidDate) {
+                return false;
+            }
+
             if (confirm('Simpan data surveilans harian ini?')) {
                 toastr.info("Menyimpan data...");
+
+                // Prepare form data for submission
+                const formData = $("#form-data").serialize();
+                console.log("Form Data Serialized:", formData);
+
                 // In actual app, this would be an AJAX call to /admisi/suerveilens/harian/control
-                console.log("Form Data Serialized:", $("#form-data").serialize());
+                $.ajax({
+                    url: '/admisi/suerveilens/harian/control',
+                    type: 'POST',
+                    data: formData,
+                    success: function(response) {
+                        toastr.success("Data berhasil disimpan.");
+                        // Optionally redirect or reset form
+                    },
+                    error: function(xhr, status, error) {
+                        toastr.error("G menyimpan data: " + error);
+                        console.error("Submission error:", error);
+                    }
+                });
+
+                // Simulated success for demo
                 setTimeout(() => {
                     toastr.success("Data berhasil disimpan secara simulasi.");
                 }, 1000);
